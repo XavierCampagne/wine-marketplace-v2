@@ -1,7 +1,7 @@
 import { ReadonlyURLSearchParams } from 'next/navigation';
 
 export const baseUrl = process.env.NODE_ENV === 'production'
-  ? `https://${process.env.VERCEL_URL || 'wine-marketplace.vercel.app'}`
+  ? `https://${process.env.VERCEL_URL || 'wine-marketplace-v2.vercel.app'}`
   : 'http://localhost:3000';
 
 export const createUrl = (
