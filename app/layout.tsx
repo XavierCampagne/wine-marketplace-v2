@@ -1,46 +1,112 @@
-import { CartProvider } from 'components/cart/cart-context';
-import { Navbar } from 'components/layout/navbar';
-import { WelcomeToast } from 'components/welcome-toast';
-import { GeistSans } from 'geist/font/sans';
-import { getCart } from 'lib/shopify';
-import { ReactNode } from 'react';
-import { Toaster } from 'sonner';
+'use client';
+
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 import './globals.css';
-import { baseUrl } from 'lib/utils';
 
-const { SITE_NAME } = process.env;
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState(null);
+  const [showAgeModal, setShowAgeModal] = useState(false);
 
-export const metadata = {
-  metadataBase: new URL(baseUrl),
-  title: {
-    default: SITE_NAME!,
-    template: `%s | ${SITE_NAME}`
-  },
-  robots: {
-    follow: true,
-    index: true
-  }
-};
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      if (!user || !user.user_metadata?.is_over_21) {
+        setShowAgeModal(true);
+      }
+    };
+    fetchUser();
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user && !session.user.user_metadata?.is_over_21) {
+        setShowAgeModal(true);
+      }
+    });
+    return () => authListener.subscription.unsubscribe();
+  }, []);
 
-export default async function RootLayout({
-  children
-}: {
-  children: ReactNode;
-}) {
-  // Don't await the fetch, pass the Promise to the context provider
-  const cart = getCart();
+  const handleAgeConfirm = async () => {
+    if (user) {
+      await supabase.auth.updateUser({ data: { is_over_21: true } });
+      setShowAgeModal(false);
+    } else {
+      setShowAgeModal(false);
+    }
+  };
 
   return (
-    <html lang="en" className={GeistSans.variable}>
-      <body className="bg-neutral-50 text-black selection:bg-teal-300 dark:bg-neutral-900 dark:text-white dark:selection:bg-pink-500 dark:selection:text-white">
-        <CartProvider cartPromise={cart}>
-          <Navbar />
-          <main>
-            {children}
-            <Toaster closeButton />
-            <WelcomeToast />
-          </main>
-        </CartProvider>
+    <html lang="en">
+      <body>
+        <nav className="fixed top-0 left-0 right-0 bg-[#1a1a1a] text-white p-4 shadow-lg z-50">
+          <div className="container mx-auto flex justify-between items-center">
+            <Link href="/" className="text-2xl font-bold tracking-tight">
+              🍷 Wine Marketplace
+            </Link>
+            <div className="flex items-center space-x-4">
+              <input
+                type="text"
+                placeholder="Search wines..."
+                className="bg-gray-800 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#800020]"
+                disabled
+              />
+              <Link href="/" className="hover:text-[#800020] transition-colors">
+                Home
+              </Link>
+              <Link href="/collection" className="hover:text-[#800020] transition-colors">
+                Catalogue
+              </Link>
+              <Link href="/about" className="hover:text-[#800020] transition-colors">
+                About Us
+              </Link>
+              <Link href="/sell" className="hover:text-[#800020] transition-colors">
+                Sell
+              </Link>
+              {user ? (
+                <button
+                  onClick={() => supabase.auth.signOut()}
+                  className="hover:text-[#800020] transition-colors"
+                >
+                  Sign Out
+                </button>
+              ) : (
+                <Link href="/login" className="hover:text-[#800020] transition-colors">
+                  Sign In
+                </Link>
+              )}
+            </div>
+          </div>
+        </nav>
+
+        {showAgeModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+            <div className="bg-gray-900 p-6 rounded-lg shadow-lg">
+              <h2 className="text-2xl font-bold mb-4 text-white">Age Verification</h2>
+              <p className="mb-4 text-gray-300">You must be 21 or older to access this site.</p>
+              <button
+                onClick={handleAgeConfirm}
+                className="bg-[#800020] text-white px-4 py-2 rounded-lg hover:bg-[#a00030] transition-colors"
+              >
+                I am 21 or older
+              </button>
+              <button
+                onClick={() => window.location.href = 'https://www.google.com'}
+                className="ml-4 text-gray-400 underline hover:text-gray-200"
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        )}
+
+        <main className="pt-20">{children}</main>
+
+        <footer className="bg-[#1a1a1a] text-gray-400 p-6 mt-12">
+          <div className="container mx-auto text-center">
+            <p>&copy; 2025 Wine Marketplace. All rights reserved.</p>
+          </div>
+        </footer>
       </body>
     </html>
   );
