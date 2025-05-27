@@ -1,10 +1,22 @@
-// File: app/product/[handle]/page.tsx
-import { getProduct } from '../../../lib/data';
+import { createClient } from '@supabase/supabase-js';
 
-export default async function ProductPage({ params }: { params: { handle: string } }) {
-  const bottle = await getProduct(params.handle);
+const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_KEY!);
 
-  if (!bottle) {
+type ProductPageProps = {
+  params: Promise<{ handle: string }>;
+};
+
+export default async function ProductPage({ params }: ProductPageProps) {
+  const { handle } = await params; // Await the params Promise to get the handle
+
+  // Fetch product data from Supabase
+  const { data: bottle, error } = await supabase
+    .from('products') // Adjust table name if different
+    .select('domaine, appellation, millesime, type, contenance, quantite, region')
+    .eq('handle', handle)
+    .single();
+
+  if (error || !bottle) {
     return <div className="container mx-auto p-6 text-white">Bottle not found</div>;
   }
 
